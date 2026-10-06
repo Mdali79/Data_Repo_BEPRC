@@ -1,0 +1,13 @@
+{% if field.widget_type == 'checkbox' %}
+<div class="field">
+  <label class="switch" style="font-weight:500">{{ field }}<span class="track"></span>{{ field.label }}</label>
+  {% if field.help_text %}<span class="help">{{ field.help_text|safe }}</span>{% endif %}
+  {% for e in field.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+</div>
+{% else %}
+<div class="field {{ cls }}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span style="color:var(--bad)">*</span>{% endif %}</label>
+  {{ field }}
+  {% for e in field.errors %}<div class="field-error">{{ e }}</div>{% empty %}{% if field.help_text and not hide_help %}<span class="help">{{ field.help_text|safe }}</span>{% endif %}{% endfor %}
+</div>
+{% endif %}

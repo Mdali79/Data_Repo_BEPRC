@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Submission #{{ submission.pk }}{% endblock %}
+{% block crumb %}<a href="{% url 'submission_list' %}">Submissions</a> / #{{ submission.pk }}{% endblock %}
+{% block page_title %}Report for {{ submission.report_date|date:"d M Y" }}{% endblock %}
+{% block content %}
+
+{% if submission.status == 'failed' %}
+<div class="alert alert-error"><svg class="icon"><use href="#i-alert"/></svg>
+  <div><strong>Parsing failed.</strong> {{ submission.error_message }}</div>
+</div>
+{% elif submission.status == 'parsed' or submission.status == 'approved' %}
+<div class="alert alert-success"><svg class="icon"><use href="#i-check"/></svg>
+  <div>Report parsed successfully{% if submission.parsed_at %} on {{ submission.parsed_at|date:"d M Y, H:i" }}{% endif %}. It now appears in the dashboard and reports.</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head">
+    <div><h2>{{ submission.organization }}</h2><div class="sub">{{ submission.original_filename }}</div></div>
+    <div class="actions">
+      <span class="badge {{ submission.status }}">{{ submission.get_status_display }}</span>
+    </div>
+  </div>
+  <dl class="kv" style="margin:0">
+    <div><dt>Report date</dt><dd>{{ submission.report_date|date:"l, d M Y" }}</dd></div>
+    <div><dt>Uploaded</dt><dd>{{ submission.uploaded_at|date:"d M Y, H:i" }}</dd></div>
+    <div><dt>Generating units referenced</dt><dd>{{ unit_count }}</dd></div>
+    <div><dt>Hourly system readings</dt><dd>{{ hourly_count }}</dd></div>
+  </dl>
+  <div class="card-body" style="display:flex; gap:10px; flex-wrap:wrap">
+    <a class="btn btn-outline" href="{% url 'submission_list' %}"><svg class="icon"><use href="#i-arrow-left"/></svg>Back to submissions</a>
+    {% if submission.file %}<a class="btn btn-outline" href="{{ submission.file.url }}"><svg class="icon"><use href="#i-download"/></svg>Download original</a>{% endif %}
+    {% if user.can.view_reports %}<a class="btn btn-outline" href="{% url 'report_system_hourly' %}?start={{ submission.report_date|date:'Y-m-d' }}&end={{ submission.report_date|date:'Y-m-d' }}"><svg class="icon"><use href="#i-line"/></svg>Hourly report for this day</a>{% endif %}
+    <span style="flex:1"></span>
+    {% if user.can.review_submissions and submission.status != 'failed' %}
+      {% if submission.status != 'approved' %}
+      <form method="post" action="{% url 'submission_status' submission.pk %}" style="margin:0"
+            data-confirm="Approve the report for {{ submission.report_date|date:'d M Y' }}? It will be marked as reviewed." data-confirm-title="Approve this report?" data-confirm-ok="Approve">
+        {% csrf_token %}<input type="hidden" name="status" value="approved">
+        <button class="btn" type="submit"><svg class="icon"><use href="#i-check"/></svg>Approve</button>
+      </form>
+      {% endif %}
+      {% if submission.status != 'needs_review' %}
+      <form method="post" action="{% url 'submission_status' submission.pk %}" style="margin:0"
+            data-confirm="Flag this report for review? It stays out of reports until it's approved or reset to parsed." data-confirm-title="Mark as needs review?" data-confirm-ok="Mark for review">
+        {% csrf_token %}<input type="hidden" name="status" value="needs_review">
+        <button class="btn btn-outline" type="submit">Needs review</button>
+      </form>
+      {% endif %}
+      {% if submission.status == 'approved' or submission.status == 'needs_review' %}
+      <form method="post" action="{% url 'submission_status' submission.pk %}" style="margin:0"
+            data-confirm="Set this report back to “Parsed”?" data-confirm-title="Reset status?" data-confirm-ok="Reset">
+        {% csrf_token %}<input type="hidden" name="status" value="parsed">
+        <button class="btn btn-ghost" type="submit"><svg class="icon"><use href="#i-reset"/></svg>Reset</button>
+      </form>
+      {% endif %}
+    {% endif %}
+    {% if user.can.delete_submissions %}
+    <form method="post" action="{% url 'submission_delete' submission.pk %}" style="margin:0"
+          data-confirm="{{ submission.original_filename }} and every row parsed from it will be permanently removed. This can't be undone."
+          data-confirm-title="Delete this submission?" data-confirm-ok="Delete" data-confirm-variant="danger">
+      {% csrf_token %}<input type="hidden" name="next" value="{% url 'submission_list' %}">
+      <button class="btn btn-danger" type="submit"><svg class="icon"><use href="#i-trash"/></svg>Delete</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if summary %}
+<div class="stats">
+  <div class="stat"><span class="stat-icon"><svg class="icon"><use href="#i-bolt"/></svg></span><div>
+    <div class="stat-label">Evening peak generation</div>
+    <div class="stat-value">{{ summary.evening_peak_generation_mw|floatformat:"0g" }}<small>MW</small></div>
+    <div class="stat-meta">at {{ summary.evening_peak_generation_time|time:"H:i"|default:"—" }}</div></div></div>
+  <div class="stat"><span class="stat-icon warn"><svg class="icon"><use href="#i-gauge"/></svg></span><div>
+    <div class="stat-label">Evening peak demand</div>
+    <div class="stat-value">{{ summary.evening_peak_demand_mw|floatformat:"0g" }}<small>MW</small></div>
+    <div class="stat-meta">at {{ summary.evening_peak_demand_time|time:"H:i"|default:"—" }}</div></div></div>
+  <div class="stat"><span class="stat-icon bad"><svg class="icon"><use href="#i-plug"/></svg></span><div>
+    <div class="stat-label">Energy unserved</div>
+    <div class="stat-value">{{ summary.energy_unserved_mkwh|floatformat:2 }}<small>MkWh</small></div>
+    <div class="stat-meta">of {{ summary.energy_demand_mkwh|floatformat:1 }} MkWh demand</div></div></div>
+  <div class="stat"><span class="stat-icon good"><svg class="icon"><use href="#i-coin"/></svg></span><div>
+    <div class="stat-label">Production cost</div>
+    <div class="stat-value">{{ summary.production_cost_per_kwh_tk|floatformat:2 }}<small>Tk/kWh</small></div>
+    <div class="stat-meta">Energy generated {{ summary.energy_generated_mkwh|floatformat:1 }} MkWh</div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>System summary</h2><div class="sub">From sheet P1</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Measure</th><th class="r">Value</th><th class="r">Time</th></tr></thead>
+      <tbody>
+        <tr><td>Day peak generation</td><td class="r">{{ summary.day_peak_generation_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.day_peak_generation_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Day peak demand</td><td class="r">{{ summary.day_peak_demand_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.day_peak_demand_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Evening peak generation</td><td class="r">{{ summary.evening_peak_generation_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.evening_peak_generation_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Evening peak demand</td><td class="r">{{ summary.evening_peak_demand_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.evening_peak_demand_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Minimum generation</td><td class="r">{{ summary.min_generation_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.min_generation_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Maximum generation</td><td class="r">{{ summary.max_generation_mw|floatformat:"2g" }} MW</td><td class="r">{{ summary.max_generation_time|time:"H:i"|default:"—" }}</td></tr>
+        <tr><td>Energy generated</td><td class="r">{{ summary.energy_generated_mkwh|floatformat:2 }} MkWh</td><td class="r muted">—</td></tr>
+        <tr><td>Energy unserved</td><td class="r">{{ summary.energy_unserved_mkwh|floatformat:2 }} MkWh</td><td class="r muted">—</td></tr>
+        <tr><td>Max temperature</td><td class="r">{{ summary.max_temperature_c|floatformat:1 }} °C</td><td class="r muted">—</td></tr>
+        <tr><td>Total gas supplied</td><td class="r">{{ summary.total_gas_supplied_mmcfd|floatformat:"2g" }} MMCFD</td><td class="r muted">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

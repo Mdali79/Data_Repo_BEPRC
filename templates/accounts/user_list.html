@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Users{% endblock %}
+{% block crumb %}Super admin{% endblock %}
+{% block page_title %}Users{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <div><h2>All users</h2><div class="sub">{{ total }} account{{ total|pluralize }} · roles decide what each person can see and do</div></div>
+    <div class="actions">
+      <a class="btn btn-outline btn-sm" href="{% url 'role_list' %}"><svg class="icon"><use href="#i-key"/></svg>Roles &amp; permissions</a>
+      <a class="btn btn-sm" href="{% url 'user_create' %}"><svg class="icon"><use href="#i-plus"/></svg>Add user</a>
+    </div>
+  </div>
+
+  <form method="get" class="filters" role="search" style="border-radius:0">
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+    {% if request.GET.per_page %}<input type="hidden" name="per_page" value="{{ request.GET.per_page }}">{% endif %}
+    <div class="field grow">
+      <label for="q">Search</label>
+      <div class="search-input"><svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" id="q" name="q" value="{{ q }}" placeholder="Username, name or email…"></div>
+    </div>
+    <div class="field">
+      <label for="role">Role</label>
+      <select id="role" name="role" data-autosubmit>
+        <option value="">All roles</option>
+        <option value="__super" {% if current_role == '__super' %}selected{% endif %}>Super admin</option>
+        {% for r in roles %}<option value="{{ r.slug }}" {% if current_role == r.slug %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="org">Organization</label>
+      <select id="org" name="org" data-autosubmit>
+        <option value="">All organizations</option>
+        <option value="__none" {% if current_org == '__none' %}selected{% endif %}>No organization</option>
+        {% for o in orgs %}<option value="{{ o.pk }}" {% if current_org == o.pk|stringformat:"s" %}selected{% endif %}>{{ o }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field" style="min-width:130px">
+      <label for="status">Status</label>
+      <select id="status" name="status" data-autosubmit>
+        <option value="">Any</option>
+        <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+      </select>
+    </div>
+    <button class="btn" type="submit"><svg class="icon"><use href="#i-filter"/></svg>Apply</button>
+    {% if chips %}<a class="btn btn-ghost" href="{% url 'user_list' %}"><svg class="icon"><use href="#i-reset"/></svg>Reset</a>{% endif %}
+  </form>
+  {% url 'user_list' as reset_url %}{% filter_chips chips reset_url %}
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        {% sort_th "User" "username" %}
+        {% sort_th "Role" "role" %}
+        {% sort_th "Organization" "org" %}
+        <th>Status</th>
+        {% sort_th "Last login" "login" %}
+        <th class="r">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for u in page %}
+        <tr>
+          <td>
+            <div style="display:flex; align-items:center; gap:10px">
+              <span class="avatar" style="width:32px;height:32px;{% if not u.is_active %}background:var(--muted){% endif %}">{{ u.username|slice:":1" }}</span>
+              <div><a href="{% url 'user_edit' u.pk %}" style="color:var(--text); font-weight:600">{{ u.username }}</a>{% if u.pk == user.pk %} <span class="muted">(you)</span>{% endif %}
+                <div class="muted" style="font-size:12px">{{ u.get_full_name|default:u.email|default:"—" }}</div></div>
+            </div>
+          </td>
+          <td>{% if u.is_superuser %}<span class="pill super">Super admin</span>{% else %}<span class="pill">{{ u.get_role_display }}</span>{% endif %}</td>
+          <td>{{ u.organization|default:"—" }}</td>
+          <td>{% if u.is_active %}<span class="badge approved">Active</span>{% else %}<span class="badge failed">Inactive</span>{% endif %}</td>
+          <td class="muted num" style="white-space:nowrap">{% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else %}Never{% endif %}</td>
+          <td>
+            <div class="row-actions">
+              <a class="icon-btn sm" href="{% url 'user_edit' u.pk %}" title="Edit" aria-label="Edit {{ u.username }}"><svg class="icon"><use href="#i-edit"/></svg></a>
+              {% if u.pk != user.pk %}
+              <form method="post" action="{% url 'user_toggle_active' u.pk %}"
+                    {% if u.is_active %}data-confirm="{{ u.username }} won't be able to log in until you activate the account again. Their data is kept." data-confirm-title="Deactivate {{ u.username }}?" data-confirm-ok="Deactivate" data-confirm-variant="danger"
+                    {% else %}data-confirm="{{ u.username }} will be able to log in again with their existing password." data-confirm-title="Activate {{ u.username }}?" data-confirm-ok="Activate"{% endif %}>
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="icon-btn sm" type="submit" title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}" aria-label="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}"><svg class="icon"><use href="#i-power"/></svg></button>
+              </form>
+              <form method="post" action="{% url 'user_delete' u.pk %}"
+                    data-confirm="The account {{ u.username }} will be permanently deleted. Consider deactivating instead if you might need it again." data-confirm-title="Delete {{ u.username }}?" data-confirm-ok="Delete user" data-confirm-variant="danger">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="icon-btn sm danger" type="submit" title="Delete" aria-label="Delete {{ u.username }}"><svg class="icon"><use href="#i-trash"/></svg></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="empty"><svg class="icon"><use href="#i-users"/></svg><div>No users match these filters.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% pagination page "users" %}
+</div>
+{% endblock %}

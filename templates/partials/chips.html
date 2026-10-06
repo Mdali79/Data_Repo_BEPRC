@@ -1,0 +1,9 @@
+{% if items %}
+<div class="chips">
+  <span class="lbl">Active filters:</span>
+  {% for c in items %}
+    <span class="chip">{{ c.label }}: <b>{{ c.value }}</b><a href="{{ c.remove_url }}" title="Remove this filter" aria-label="Remove {{ c.label }} filter"><svg class="icon"><use href="#i-x"/></svg></a></span>
+  {% endfor %}
+  <a class="clear" href="{{ reset_url }}">Clear all</a>
+</div>
+{% endif %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}No access{% endblock %}
+{% block page_title %}No access{% endblock %}
+{% block content %}
+<div class="card empty-403"><div class="card-body">
+  <div class="modal-icon warning"><svg class="icon"><use href="#i-lock"/></svg></div>
+  <h2 style="font-size:18px; margin-bottom:6px">You don't have access to this page</h2>
+  <p class="muted" style="margin:0 0 20px">{{ message }} Ask a super admin to update your role if you need it.</p>
+  <a class="btn btn-outline" href="javascript:history.back()"><svg class="icon"><use href="#i-arrow-left"/></svg>Go back</a>
+  {% if user.can.view_dashboard %}<a class="btn" href="{% url 'dashboard' %}">Dashboard</a>{% endif %}
+</div></div>
+{% endblock %}
+{% block content_anon %}<p>Please <a href="{% url 'login' %}">log in</a>.</p>{% endblock %}

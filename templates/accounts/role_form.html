@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{% if role %}Edit role{% else %}New role{% endif %}{% endblock %}
+{% block crumb %}<a href="{% url 'role_list' %}">Roles &amp; permissions</a> / {% if role %}{{ role.name }}{% else %}New{% endif %}{% endblock %}
+{% block page_title %}{% if role %}Edit role: {{ role.name }}{% else %}New role{% endif %}{% endblock %}
+{% block content %}
+<form method="post" novalidate id="roleForm"
+      data-confirm="{% if role %}{% if users %}{{ users }} user{{ users|pluralize }} with this role will get the new permissions on their next page load.{% else %}Save the permissions for this role?{% endif %}{% else %}Create this role with the selected permissions?{% endif %}"
+      data-confirm-title="{% if role %}Save role?{% else %}Create role?{% endif %}" data-confirm-ok="{% if role %}Save role{% else %}Create role{% endif %}">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-error"><svg class="icon"><use href="#i-alert"/></svg><div>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div></div>{% endif %}
+  <div class="grid-2" style="grid-template-columns: 1fr 1.4fr">
+    <div class="card" style="align-self:start">
+      <div class="card-head"><h2>Details</h2></div>
+      <div class="card-body">
+        {% include "partials/field.html" with field=form.name %}
+        {% include "partials/field.html" with field=form.slug %}
+        {% include "partials/field.html" with field=form.description %}
+        {% include "partials/field.html" with field=form.is_default %}
+        {% if role %}<p class="muted" style="font-size:12.5px; margin:8px 0 0">{{ users }} user{{ users|pluralize }} currently ha{{ users|pluralize:"s,ve" }} this role.{% if role.is_system %} Built-in roles can't be deleted.{% endif %}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Permissions</h2><div class="sub"><span id="permCount">0</span> selected</div></div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-all="1">Select all</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-all="0">Clear</button>
+        </div>
+      </div>
+      <div class="card-body">
+        {% for group, perms in groups %}
+        <div class="perm-group">
+          <div class="perm-group-head"><span>{{ group }}</span>
+            <label class="check-inline" style="height:auto; font-size:12px"><input type="checkbox" data-group-toggle="{{ forloop.counter }}"> All</label></div>
+          {% for code, label in perms %}
+          <label class="perm-row" style="cursor:pointer">
+            <span><div style="font-weight:500">{{ label }}</div><div class="code">{{ code }}</div></span>
+            <span class="switch"><input type="checkbox" name="permissions" value="{{ code }}" data-group="{{ forloop.parentloop.counter }}" {% if code in form.permissions.value %}checked{% endif %}><span class="track"></span></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px">
+    <a class="btn btn-outline" href="{% url 'role_list' %}">Cancel</a>
+    <button class="btn" type="submit" data-loading="Saving…"><svg class="icon"><use href="#i-check"/></svg>{% if role %}Save role{% else %}Create role{% endif %}</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[name=permissions]'));
+  function sync() {
+    document.getElementById("permCount").textContent = boxes.filter(function (b) { return b.checked; }).length;
+    document.querySelectorAll("[data-group-toggle]").forEach(function (t) {
+      var g = boxes.filter(function (b) { return b.dataset.group === t.dataset.groupToggle; });
+      var n = g.filter(function (b) { return b.checked; }).length;
+      t.checked = n === g.length; t.indeterminate = n > 0 && n < g.length;
+    });
+  }
+  boxes.forEach(function (b) { b.addEventListener("change", sync); });
+  document.querySelectorAll("[data-group-toggle]").forEach(function (t) {
+    t.addEventListener("change", function () { boxes.forEach(function (b) { if (b.dataset.group === t.dataset.groupToggle) b.checked = t.checked; }); sync(); });
+  });
+  document.querySelectorAll("[data-all]").forEach(function (btn) {
+    btn.addEventListener("click", function () { boxes.forEach(function (b) { b.checked = btn.dataset.all === "1"; }); sync(); });
+  });
+  sync();
+})();
+</script>
+{% endblock %}

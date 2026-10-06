@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Plant generation report{% endblock %}
+{% block crumb %}Reports{% endblock %}
+{% block page_title %}Plant generation report{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <div><h2>Average generation by unit</h2><div class="sub">Mean of hourly actuals (GenLog), MW · click a column to sort</div></div>
+    {% if user.can.export_data %}
+    <div class="actions"><a class="btn btn-outline btn-sm" href="{% url 'export_plant_generation_xlsx' %}{% qs page='' sort='' per_page='' %}"><svg class="icon"><use href="#i-download"/></svg>Download Excel</a></div>
+    {% endif %}
+  </div>
+
+  <form method="get" class="filters" role="search" style="border-radius:0">
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+    {% if request.GET.per_page %}<input type="hidden" name="per_page" value="{{ request.GET.per_page }}">{% endif %}
+    <div class="field grow">
+      <label for="q">Unit / plant</label>
+      <div class="search-input"><svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" id="q" name="q" value="{{ q }}" placeholder="e.g. Rampal, Payra, Ghorasal…"></div>
+    </div>
+    <div class="field">
+      <label for="fuel">Fuel</label>
+      <select id="fuel" name="fuel" data-autosubmit>
+        <option value="">All fuels</option>
+        {% for f in fuels %}<option {% if f == fuel %}selected{% endif %}>{{ f }}</option>{% endfor %}
+      </select>
+    </div>
+    {% daterange start end label="Report date" %}
+    <label class="switch check-inline"><input type="checkbox" name="totals" value="1" {% if totals == '1' %}checked{% endif %} data-autosubmit><span class="track"></span>Include total rows</label>
+    <button class="btn" type="submit"><svg class="icon"><use href="#i-filter"/></svg>Apply</button>
+    {% if chips %}<a class="btn btn-ghost" href="{% url 'report_plant_generation' %}"><svg class="icon"><use href="#i-reset"/></svg>Reset</a>{% endif %}
+  </form>
+  {% url 'report_plant_generation' as reset_url %}{% filter_chips chips reset_url %}
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:56px">#</th>
+        {% sort_th "Unit" "unit" %}
+        {% sort_th "Fuel" "fuel" %}
+        {% sort_th "Readings" "readings" "r" %}
+        {% sort_th "Avg generation (MW)" "avg" "r" %}
+      </tr></thead>
+      <tbody>
+      {% for r in page %}
+        <tr>
+          <td class="muted num">{{ page.start_index|add:forloop.counter0 }}</td>
+          <td style="font-weight:500">{{ r.unit__unit_name }}</td>
+          <td>{% if r.unit__fuel_type %}<span class="pill">{{ r.unit__fuel_type }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="r muted">{{ r.readings }}</td>
+          <td class="r">
+            <div class="bar-cell">
+              <div class="bar-track"><div class="bar-fill" style="width:{% if top and r.avg_generation_mw %}{% widthratio r.avg_generation_mw top 100 %}{% else %}0{% endif %}%"></div></div>
+              <span style="min-width:72px">{{ r.avg_generation_mw|floatformat:"2g"|default:"—" }}</span>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="empty"><svg class="icon"><use href="#i-bars"/></svg><div>No units match these filters.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% pagination page "units" %}
+</div>
+{% endblock %}

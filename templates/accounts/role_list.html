@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Roles & permissions{% endblock %}
+{% block crumb %}Super admin{% endblock %}
+{% block page_title %}Roles &amp; permissions{% endblock %}
+{% block content %}
+<div class="alert alert-info"><svg class="icon"><use href="#i-shield"/></svg>
+  <div>Only super admins can see this page. Each user has one role; the role's permissions decide which pages and actions they get.
+  Super admins ({{ superusers }}) always have every permission.</div></div>
+
+<div class="card">
+  <div class="card-head">
+    <div><h2>Roles</h2><div class="sub">{{ roles|length }} role{{ roles|length|pluralize }}</div></div>
+    <div class="actions"><a class="btn btn-sm" href="{% url 'role_create' %}"><svg class="icon"><use href="#i-plus"/></svg>New role</a></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Role</th><th>Description</th><th class="r">Permissions</th><th class="r">Users</th><th class="r">Actions</th></tr></thead>
+      <tbody>
+      {% for r in roles %}
+        <tr>
+          <td style="white-space:nowrap"><a href="{% url 'role_edit' r.pk %}" style="color:var(--text); font-weight:600">{{ r.name }}</a>
+            {% if r.is_default %} <span class="pill" title="Given to new sign-ups">Default</span>{% endif %}
+            {% if r.is_system %} <span class="pill" title="Built-in — can't be deleted">Built-in</span>{% endif %}</td>
+          <td class="muted">{{ r.description|default:"—" }}</td>
+          <td class="r">{{ r.permissions|length }}</td>
+          <td class="r"><a href="{% url 'user_list' %}?role={{ r.slug }}">{{ r.user_count }}</a></td>
+          <td>
+            <div class="row-actions">
+              <a class="icon-btn sm" href="{% url 'role_edit' r.pk %}" title="Edit permissions" aria-label="Edit {{ r.name }}"><svg class="icon"><use href="#i-edit"/></svg></a>
+              {% if not r.is_system %}
+              <form method="post" action="{% url 'role_delete' r.pk %}"
+                    data-confirm="{% if r.user_count %}{{ r.user_count }} user{{ r.user_count|pluralize }} still ha{{ r.user_count|pluralize:'s,ve' }} this role — move them to another role first.{% else %}The role “{{ r.name }}” will be permanently deleted.{% endif %}"
+                    data-confirm-title="Delete role “{{ r.name }}”?" data-confirm-ok="Delete role" data-confirm-variant="danger">
+                {% csrf_token %}
+                <button class="icon-btn sm danger" type="submit" title="Delete" aria-label="Delete {{ r.name }}"><svg class="icon"><use href="#i-trash"/></svg></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><div><h2>Permission matrix</h2><div class="sub">Who can do what, at a glance</div></div></div>
+  <div class="table-wrap">
+    <table class="matrix">
+      <thead><tr><th>Permission</th><th class="c">Super admin</th>{% for r in roles %}<th class="c">{{ r.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for group, perms in groups %}
+        <tr><td colspan="{{ roles|length|add:2 }}" style="background:var(--surface-2); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)">{{ group }}</td></tr>
+        {% for code, label in perms %}
+        <tr>
+          <td>{{ label }}</td>
+          <td class="c"><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></td>
+          {% for r in roles %}<td class="c">{% if code in r.perm_set %}<span class="tick" title="Granted"><svg class="icon"><use href="#i-check"/></svg></span>{% else %}<span class="dash" title="Not granted">—</span>{% endif %}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      {% endfor %}
+        <tr><td colspan="{{ roles|length|add:2 }}" style="background:var(--surface-2); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)">Super admin only</td></tr>
+        <tr><td>Manage users, roles &amp; permissions</td><td class="c"><span class="tick"><svg class="icon"><use href="#i-check"/></svg></span></td>{% for r in roles %}<td class="c"><span class="dash">—</span></td>{% endfor %}</tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

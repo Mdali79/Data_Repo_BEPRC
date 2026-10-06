@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Submissions{% endblock %}
+{% block crumb %}Data{% endblock %}
+{% block page_title %}Submissions{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head" style="flex-wrap:wrap">
+    <nav class="tabs" aria-label="Filter by status">
+      <a class="tab {% if not current_status %}active{% endif %}" href="{% qs status='' %}">All<span class="count">{{ all_count }}</span></a>
+      {% for value, label, n in status_choices %}
+        <a class="tab {% if current_status == value %}active{% endif %}" href="{% qs status=value %}">{{ label }}<span class="count">{{ n }}</span></a>
+      {% endfor %}
+    </nav>
+    {% if user.can.upload_reports %}
+    <div class="actions">
+      <a class="btn btn-sm" href="{% url 'upload' %}"><svg class="icon"><use href="#i-upload"/></svg>Upload report</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <form method="get" class="filters" role="search">
+    {% if current_status %}<input type="hidden" name="status" value="{{ current_status }}">{% endif %}
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+    {% if request.GET.per_page %}<input type="hidden" name="per_page" value="{{ request.GET.per_page }}">{% endif %}
+    <div class="field grow">
+      <label for="q">Search</label>
+      <div class="search-input"><svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" id="q" name="q" value="{{ q }}" placeholder="File name or organization…"></div>
+    </div>
+    {% if orgs %}
+    <div class="field">
+      <label for="org">Organization</label>
+      <select id="org" name="org" data-autosubmit>
+        <option value="">All organizations</option>
+        {% for o in orgs %}<option value="{{ o.pk }}" {% if current_org == o.pk|stringformat:"s" %}selected{% endif %}>{{ o }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% daterange start end label="Report date" %}
+    <button class="btn" type="submit"><svg class="icon"><use href="#i-filter"/></svg>Apply</button>
+    {% if chips %}<a class="btn btn-ghost" href="{% url 'submission_list' %}"><svg class="icon"><use href="#i-reset"/></svg>Reset</a>{% endif %}
+  </form>
+  {% url 'submission_list' as reset_url %}{% filter_chips chips reset_url %}
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        {% sort_th "Report date" "date" %}
+        {% sort_th "Organization" "org" %}
+        {% sort_th "File" "file" %}
+        {% sort_th "Status" "status" %}
+        {% sort_th "Uploaded" "uploaded" %}
+        <th class="r">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for s in page %}
+        <tr>
+          <td style="font-weight:600; white-space:nowrap"><a href="{% url 'submission_detail' s.pk %}" style="color:var(--text)">{{ s.report_date|date:"d M Y" }}</a></td>
+          <td>{{ s.organization }}</td>
+          <td class="muted" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="{{ s.original_filename }}">{{ s.original_filename }}</td>
+          <td><span class="badge {{ s.status }}">{{ s.get_status_display }}</span></td>
+          <td class="muted num" style="white-space:nowrap">{{ s.uploaded_at|date:"d M Y, H:i" }}</td>
+          <td>
+            <div class="row-actions">
+              <a class="icon-btn sm" href="{% url 'submission_detail' s.pk %}" title="View" aria-label="View"><svg class="icon"><use href="#i-eye"/></svg></a>
+              {% if user.can.review_submissions %}{% if s.status == 'parsed' or s.status == 'needs_review' %}
+              <form method="post" action="{% url 'submission_status' s.pk %}"
+                    data-confirm="Approve the report for {{ s.report_date|date:'d M Y' }}? It will be marked as reviewed."
+                    data-confirm-title="Approve this report?" data-confirm-ok="Approve">
+                {% csrf_token %}<input type="hidden" name="status" value="approved"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="icon-btn sm" type="submit" title="Approve" aria-label="Approve"><svg class="icon"><use href="#i-check"/></svg></button>
+              </form>
+              {% endif %}{% endif %}
+              {% if user.can.delete_submissions %}
+              <form method="post" action="{% url 'submission_delete' s.pk %}"
+                    data-confirm="{{ s.original_filename }} and every row parsed from it will be permanently removed. This can't be undone."
+                    data-confirm-title="Delete this submission?" data-confirm-ok="Delete" data-confirm-variant="danger">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="icon-btn sm danger" type="submit" title="Delete" aria-label="Delete"><svg class="icon"><use href="#i-trash"/></svg></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="empty">
+          <svg class="icon"><use href="#i-inbox"/></svg>
+          <div>{% if chips %}No submissions match these filters.{% else %}No submissions yet.{% endif %}</div>
+          {% if chips %}<a class="btn btn-outline btn-sm" style="margin-top:12px" href="{% url 'submission_list' %}">Clear filters</a>
+          {% elif user.can.upload_reports %}<a class="btn btn-sm" style="margin-top:12px" href="{% url 'upload' %}"><svg class="icon"><use href="#i-upload"/></svg>Upload a report</a>{% endif %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% pagination page "submissions" %}
+</div>
+{% endblock %}

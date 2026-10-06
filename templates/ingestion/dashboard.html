@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load l10n %}
+{% block title %}Dashboard{% endblock %}
+{% block crumb %}Overview{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="stats">
+  <div class="stat">
+    <span class="stat-icon"><svg class="icon"><use href="#i-bolt"/></svg></span>
+    <div>
+      <div class="stat-label">Evening peak generation</div>
+      <div class="stat-value">{% if latest %}{{ latest.evening_peak_generation_mw|floatformat:"0g" }}<small>MW</small>{% else %}—{% endif %}</div>
+      <div class="stat-meta">{% if latest %}{{ latest.report_date|date:"d M Y" }}{% if latest.evening_peak_generation_time %} · {{ latest.evening_peak_generation_time|time:"H:i" }}{% endif %}{% else %}No data yet{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat">
+    <span class="stat-icon warn"><svg class="icon"><use href="#i-gauge"/></svg></span>
+    <div>
+      <div class="stat-label">Evening peak demand</div>
+      <div class="stat-value">{% if latest %}{{ latest.evening_peak_demand_mw|floatformat:"0g" }}<small>MW</small>{% else %}—{% endif %}</div>
+      <div class="stat-meta">{% if latest %}{{ latest.report_date|date:"d M Y" }}{% if latest.evening_peak_demand_time %} · {{ latest.evening_peak_demand_time|time:"H:i" }}{% endif %}{% else %}No data yet{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat">
+    <span class="stat-icon bad"><svg class="icon"><use href="#i-plug"/></svg></span>
+    <div>
+      <div class="stat-label">Energy unserved</div>
+      <div class="stat-value">{% if latest %}{{ latest.energy_unserved_mkwh|floatformat:2 }}<small>MkWh</small>{% else %}—{% endif %}</div>
+      <div class="stat-meta">{% if latest %}of {{ latest.energy_demand_mkwh|floatformat:1 }} MkWh demand{% else %}No data yet{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat">
+    <span class="stat-icon good"><svg class="icon"><use href="#i-files"/></svg></span>
+    <div>
+      <div class="stat-label">Submissions</div>
+      <div class="stat-value">{{ total_submissions }}</div>
+      <div class="stat-meta">{{ ok_submissions }} parsed{% if failed_submissions %} · <span style="color:var(--bad)">{{ failed_submissions }} failed</span>{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 row-gap">
+  <div class="card">
+    <div class="card-head">
+      <div><h2>Evening peak: generation vs demand</h2><div class="sub">Last {{ summaries|length }} report day{{ summaries|length|pluralize }}, MW</div></div>
+      <div class="actions legend">
+        <span><i style="background:var(--series-1)"></i>Generation</span>
+        <span><i style="background:var(--series-2)"></i>Demand</span>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if summaries %}
+        <div class="chart-box"><canvas id="trend" aria-label="Evening peak generation and demand by day"></canvas></div>
+      {% else %}
+        <div class="empty"><svg class="icon"><use href="#i-line"/></svg><div>No parsed reports yet.</div><a class="btn btn-sm" style="margin-top:12px" href="{% url 'upload' %}"><svg class="icon"><use href="#i-upload"/></svg>Upload a report</a></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Quick actions</h2></div>
+    <div class="card-body" style="display:grid; gap:10px">
+      {% if user.can.upload_reports %}<a class="btn" href="{% url 'upload' %}"><svg class="icon"><use href="#i-upload"/></svg>Upload daily report</a>{% endif %}
+      {% if user.can.view_reports %}<a class="btn btn-outline" href="{% url 'report_system_hourly' %}"><svg class="icon"><use href="#i-line"/></svg>System hourly report</a>
+      <a class="btn btn-outline" href="{% url 'report_plant_generation' %}"><svg class="icon"><use href="#i-bars"/></svg>Plant generation report</a>{% endif %}
+      {% if user.can.view_submissions %}<a class="btn btn-outline" href="{% url 'submission_list' %}"><svg class="icon"><use href="#i-files"/></svg>All submissions</a>{% endif %}
+      {% if user.is_superuser %}<a class="btn btn-outline" href="{% url 'user_list' %}"><svg class="icon"><use href="#i-users"/></svg>Manage users</a>{% endif %}
+      {% if latest %}
+      <div style="margin-top:8px; padding-top:14px; border-top:1px solid var(--border); display:grid; gap:8px; font-size:13px">
+        <div style="display:flex; justify-content:space-between"><span class="muted">Max temperature</span><strong class="num">{{ latest.max_temperature_c|floatformat:1 }} °C</strong></div>
+        <div style="display:flex; justify-content:space-between"><span class="muted">Gas supplied</span><strong class="num">{{ latest.total_gas_supplied_mmcfd|floatformat:"0g" }} MMCFD</strong></div>
+        <div style="display:flex; justify-content:space-between"><span class="muted">Production cost</span><strong class="num">{{ latest.production_cost_per_kwh_tk|floatformat:2 }} Tk/kWh</strong></div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><div><h2>Recent daily summaries</h2><div class="sub">Parsed and approved reports</div></div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th class="r">Peak gen (MW)</th><th class="r">Peak demand (MW)</th><th class="r">Unserved (MkWh)</th></tr></thead>
+        <tbody>
+        {% for s in summaries reversed %}{% if forloop.counter <= 8 %}
+          <tr>
+            <td>{{ s.report_date|date:"d M Y" }}</td>
+            <td class="r">{{ s.evening_peak_generation_mw|floatformat:"0g" }}</td>
+            <td class="r">{{ s.evening_peak_demand_mw|floatformat:"0g" }}</td>
+            <td class="r">{{ s.energy_unserved_mkwh|floatformat:2 }}</td>
+          </tr>
+        {% endif %}{% empty %}
+          <tr><td colspan="4" class="empty">No reports yet — <a href="{% url 'upload' %}">upload one</a>.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Latest uploads</h2><div class="actions"><a class="btn btn-ghost btn-sm" href="{% url 'submission_list' %}">View all</a></div></div>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+        {% for s in recent_submissions %}
+          <tr style="cursor:pointer" onclick="location.href='{% url 'submission_detail' s.pk %}'">
+            <td><a href="{% url 'submission_detail' s.pk %}" style="color:var(--text); font-weight:600">{{ s.report_date|date:"d M Y" }}</a><div class="muted" style="font-size:12px">{{ s.uploaded_at|timesince }} ago</div></td>
+            <td class="r"><span class="badge {{ s.status }}">{{ s.get_status_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td class="empty">Nothing uploaded yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if summaries %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+{% localize off %}
+const trend = [{% for s in summaries %}{d:"{{ s.report_date|date:'d M' }}", g:{{ s.evening_peak_generation_mw|default_if_none:"null" }}, dm:{{ s.evening_peak_demand_mw|default_if_none:"null" }}},{% endfor %}];
+{% endlocalize %}
+(function () {
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  let chart;
+  function draw() {
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("trend"), {
+      type: "line",
+      data: {
+        labels: trend.map(r => r.d),
+        datasets: [
+          { label: "Generation", data: trend.map(r => r.g), borderColor: css("--series-1"), backgroundColor: css("--series-1"), borderWidth: 2, pointRadius: trend.length > 12 ? 0 : 4, pointHoverRadius: 5, tension: 0.3 },
+          { label: "Demand", data: trend.map(r => r.dm), borderColor: css("--series-2"), backgroundColor: css("--series-2"), borderWidth: 2, pointRadius: trend.length > 12 ? 0 : 4, pointHoverRadius: 5, tension: 0.3 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: css("--surface"), titleColor: css("--text"), bodyColor: css("--text-2"), borderColor: css("--border"), borderWidth: 1, padding: 10,
+            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y == null ? "—" : Math.round(c.parsed.y).toLocaleString()} MW` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: css("--muted"), maxTicksLimit: 10 } },
+          y: { grid: { color: css("--border") }, border: { display: false }, ticks: { color: css("--muted"), callback: v => v.toLocaleString() } },
+        },
+      },
+    });
+  }
+  if (typeof Chart === "undefined") {
+    document.getElementById("trend").parentNode.innerHTML = '<div class="empty">Chart could not load (no internet connection). The table below has the same data.</div>';
+    return;
+  }
+  draw();
+  document.addEventListener("themechange", draw);
+})();
+</script>
+{% endif %}
+{% endblock %}

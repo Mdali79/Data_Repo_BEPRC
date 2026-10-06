@@ -1,0 +1,31 @@
+{% load ui %}
+<div class="pagination">
+  <div class="info">
+    {% if page.paginator.count %}
+      Showing <b>{{ page.start_index }}–{{ page.end_index }}</b> of <b>{{ page.paginator.count }}</b> {{ noun }}
+    {% else %}No {{ noun }}{% endif %}
+  </div>
+  <label class="per-page">Rows per page
+    <select data-per-page aria-label="Rows per page">
+      {% for n in page.per_page_choices %}<option value="{{ n }}" {% if n == page.per_page %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if page.paginator.num_pages > 1 %}
+  <nav class="pages" aria-label="Pagination">
+    <a class="page-btn {% if not page.has_previous %}disabled{% endif %}" href="{% qs page=1 %}" title="First page" aria-label="First page"><svg class="icon"><use href="#i-chevs-left"/></svg></a>
+    <a class="page-btn {% if not page.has_previous %}disabled{% endif %}" href="{% if page.has_previous %}{% qs page=page.previous_page_number %}{% else %}#{% endif %}" title="Previous" aria-label="Previous page"><svg class="icon"><use href="#i-chev-left"/></svg></a>
+    {% for n in page.elided_range %}
+      {% if n == page.paginator.ELLIPSIS %}<span class="page-gap">…</span>
+      {% elif n == page.number %}<span class="page-btn active" aria-current="page">{{ n }}</span>
+      {% else %}<a class="page-btn" href="{% qs page=n %}">{{ n }}</a>{% endif %}
+    {% endfor %}
+    <a class="page-btn {% if not page.has_next %}disabled{% endif %}" href="{% if page.has_next %}{% qs page=page.next_page_number %}{% else %}#{% endif %}" title="Next" aria-label="Next page"><svg class="icon"><use href="#i-chev-right"/></svg></a>
+    <a class="page-btn {% if not page.has_next %}disabled{% endif %}" href="{% qs page=page.paginator.num_pages %}" title="Last page" aria-label="Last page"><svg class="icon"><use href="#i-chevs-right"/></svg></a>
+    {% if page.paginator.num_pages > 7 %}
+    <form class="page-jump" data-page-jump>
+      <span>Go to</span><input type="number" min="1" max="{{ page.paginator.num_pages }}" value="{{ page.number }}" aria-label="Page number">
+    </form>
+    {% endif %}
+  </nav>
+  {% endif %}
+</div>

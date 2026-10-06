@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content_anon %}
+<h1>Welcome back</h1>
+<p class="lead">Log in to the BEPRC data platform.</p>
+
+{% if form.non_field_errors %}
+<div class="alert alert-error"><svg class="icon"><use href="#i-alert"/></svg>
+  <div>{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+</div>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="field">
+    <label for="{{ form.username.id_for_label }}">Username</label>
+    <input type="text" name="username" id="{{ form.username.id_for_label }}" value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus required placeholder="Enter your username">
+  </div>
+  <div class="field">
+    <label for="{{ form.password.id_for_label }}">Password</label>
+    <input type="password" name="password" id="{{ form.password.id_for_label }}" autocomplete="current-password" required placeholder="••••••••">
+  </div>
+  <button class="btn btn-block" type="submit">Log in <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+</form>
+<p class="auth-foot">No account yet? <a href="{% url 'signup' %}">Create one</a></p>
+{% endblock %}
+
+{% block content %}
+<div class="card"><div class="card-body">
+  You're already logged in as <strong>{{ user.username }}</strong>. <a href="{% url 'dashboard' %}">Go to the dashboard</a>.
+</div></div>
+{% endblock %}

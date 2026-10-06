@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{% if creating %}Add user{% else %}Edit {{ target.username }}{% endif %}{% endblock %}
+{% block crumb %}<a href="{% url 'user_list' %}">Users</a> / {% if creating %}New{% else %}{{ target.username }}{% endif %}{% endblock %}
+{% block page_title %}{% if creating %}Add a user{% else %}Edit {{ target.username }}{% endif %}{% endblock %}
+{% block content %}
+<form method="post" novalidate
+      data-confirm="{% if creating %}Create this account with the role and organization selected?{% else %}Save the changes to {{ target.username }}? Role changes take effect on their next page load.{% endif %}"
+      data-confirm-title="{% if creating %}Create user?{% else %}Save changes?{% endif %}" data-confirm-ok="{% if creating %}Create user{% else %}Save changes{% endif %}">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-error"><svg class="icon"><use href="#i-alert"/></svg><div>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div></div>{% endif %}
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Account</h2></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="full">{% include "partials/field.html" with field=form.username %}</div>
+          {% include "partials/field.html" with field=form.first_name %}
+          {% include "partials/field.html" with field=form.last_name %}
+          <div class="full">{% include "partials/field.html" with field=form.email %}</div>
+        </div>
+        <div class="section-title" style="margin-top:12px">{% if creating %}Password{% else %}Change password{% endif %}</div>
+        <div class="form-grid">
+          {% if creating %}
+            {% include "partials/field.html" with field=form.password1 hide_help=True %}
+            {% include "partials/field.html" with field=form.password2 hide_help=True %}
+            <div class="full help" style="margin-top:-8px; font-size:12px; color:var(--muted)">At least 8 characters, not too common, not all numbers.</div>
+          {% else %}
+            {% include "partials/field.html" with field=form.new_password1 %}
+            {% include "partials/field.html" with field=form.new_password2 %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Access</h2></div>
+      <div class="card-body">
+        {% include "partials/field.html" with field=form.role %}
+        {% include "partials/field.html" with field=form.organization %}
+        {% include "partials/field.html" with field=form.is_active %}
+        {% include "partials/field.html" with field=form.is_superuser %}
+        <div class="alert alert-info" style="margin:8px 0 0"><svg class="icon"><use href="#i-key"/></svg>
+          <div>A role is a set of permissions. <a href="{% url 'role_list' %}">See what each role can do</a>. Super admins have every permission and can manage users and roles.</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px">
+    <a class="btn btn-outline" href="{% url 'user_list' %}">Cancel</a>
+    <button class="btn" type="submit" data-loading="Saving…"><svg class="icon"><use href="#i-check"/></svg>{% if creating %}Create user{% else %}Save changes{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

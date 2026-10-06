@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load l10n ui %}
+{% block title %}System hourly report{% endblock %}
+{% block crumb %}Reports{% endblock %}
+{% block page_title %}System hourly report{% endblock %}
+{% block content %}
+<div class="card">
+  <form method="get" class="filters" role="search" style="border-radius:var(--radius); border-bottom:0">
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+    {% if request.GET.per_page %}<input type="hidden" name="per_page" value="{{ request.GET.per_page }}">{% endif %}
+    {% daterange start end label="Report date" %}
+    <div class="field" style="min-width:120px">
+      <label for="hour_from">Hour from</label>
+      <select id="hour_from" name="hour_from" data-autosubmit><option value="">Any</option>{% for h in hours %}<option {% if h == hour_from %}selected{% endif %}>{{ h }}</option>{% endfor %}</select>
+    </div>
+    <div class="field" style="min-width:120px">
+      <label for="hour_to">Hour to</label>
+      <select id="hour_to" name="hour_to" data-autosubmit><option value="">Any</option>{% for h in hours %}<option {% if h == hour_to %}selected{% endif %}>{{ h }}</option>{% endfor %}</select>
+    </div>
+    <label class="switch check-inline"><input type="checkbox" name="shed" value="1" {% if shed == '1' %}checked{% endif %} data-autosubmit><span class="track"></span>Only hours with load-shed</label>
+    <span class="spacer"></span>
+    {% if chips %}<a class="btn btn-ghost" href="{% url 'report_system_hourly' %}"><svg class="icon"><use href="#i-reset"/></svg>Reset</a>{% endif %}
+    {% if user.can.export_data %}<a class="btn btn-outline" href="{% url 'export_system_hourly_csv' %}{% qs page='' sort='' per_page='' %}"><svg class="icon"><use href="#i-download"/></svg>Download CSV</a>{% endif %}
+  </form>
+  {% url 'report_system_hourly' as reset_url %}{% filter_chips chips reset_url %}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div><h2>Generation vs demand</h2><div class="sub">{{ rows|length }} hourly reading{{ rows|length|pluralize }}, MW</div></div>
+    <div class="actions legend">
+      <span><i style="background:var(--series-1)"></i>Generation</span>
+      <span><i style="background:var(--series-2)"></i>Demand</span>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if rows %}
+      <div class="chart-box"><canvas id="chart" aria-label="Hourly generation and demand"></canvas></div>
+    {% else %}
+      <div class="empty"><svg class="icon"><use href="#i-line"/></svg><div>No data in this date range.</div></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Hourly readings</h2><div class="sub">From sheet P4 · click a column to sort</div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        {% sort_th "Date / hour" "time" %}
+        {% sort_th "Generation (MW)" "gen" "r" %}
+        {% sort_th "Load-shed (MW)" "shed" "r" %}
+        {% sort_th "Demand (MW)" "demand" "r" %}
+      </tr></thead>
+      <tbody>
+      {% for r in page %}
+        <tr>
+          <td class="num">{{ r.report_date|date:"d M Y" }} <span class="muted">· {{ r.hour|time:"H:i" }}</span></td>
+          <td class="r">{{ r.generation_mw|floatformat:"2g" }}</td>
+          <td class="r" {% if r.load_shed_mw %}style="color:var(--bad); font-weight:600"{% endif %}>{{ r.load_shed_mw|floatformat:"2g" }}</td>
+          <td class="r">{{ r.demand_mw|floatformat:"2g" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="empty">No data matches these filters.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% pagination page "hourly readings" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if rows %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+{% localize off %}
+const rows = [{% for r in rows %}{d:"{{ r.report_date|date:'d M' }} {{ r.hour|time:'H:i' }}", g:{{ r.generation_mw|default_if_none:"null" }}, dm:{{ r.demand_mw|default_if_none:"null" }}},{% endfor %}];
+{% endlocalize %}
+(function () {
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  let chart;
+  function draw() {
+    if (chart) chart.destroy();
+    const dense = rows.length > 30;
+    chart = new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels: rows.map(r => r.d),
+        datasets: [
+          { label: "Generation", data: rows.map(r => r.g), borderColor: css("--series-1"), backgroundColor: css("--series-1"), borderWidth: 2, pointRadius: dense ? 0 : 3, pointHoverRadius: 5, tension: 0.3 },
+          { label: "Demand", data: rows.map(r => r.dm), borderColor: css("--series-2"), backgroundColor: css("--series-2"), borderWidth: 2, pointRadius: dense ? 0 : 3, pointHoverRadius: 5, tension: 0.3 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: css("--surface"), titleColor: css("--text"), bodyColor: css("--text-2"), borderColor: css("--border"), borderWidth: 1, padding: 10,
+            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y == null ? "—" : Math.round(c.parsed.y).toLocaleString()} MW` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: css("--muted"), maxTicksLimit: 12, maxRotation: 0 } },
+          y: { grid: { color: css("--border") }, border: { display: false }, ticks: { color: css("--muted"), callback: v => v.toLocaleString() } },
+        },
+      },
+    });
+  }
+  if (typeof Chart === "undefined") {
+    document.getElementById("chart").parentNode.innerHTML = '<div class="empty">Chart could not load (no internet connection). The table below has the same data.</div>';
+    return;
+  }
+  draw();
+  document.addEventListener("themechange", draw);
+})();
+</script>
+{% endif %}
+{% endblock %}

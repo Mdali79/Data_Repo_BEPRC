@@ -1,0 +1,13 @@
+<div class="field">
+  <label>{{ label }}</label>
+  <div class="drp" data-drp data-submit data-placeholder="Any date">
+    <input type="hidden" name="{{ start_name }}" value="{{ start }}" data-drp-start>
+    <input type="hidden" name="{{ end_name }}" value="{{ end }}" data-drp-end>
+    <button type="button" class="drp-trigger" aria-haspopup="dialog">
+      <svg class="icon"><use href="#i-calendar"/></svg>
+      <span class="drp-label">{% if start or end %}{{ start }} – {{ end }}{% else %}<span class="ph">Any date</span>{% endif %}</span>
+      <span class="drp-clear" title="Clear dates" style="{% if not start and not end %}display:none{% endif %}"><svg class="icon" style="width:13px;height:13px"><use href="#i-x"/></svg></span>
+    </button>
+    <div class="drp-pop" role="dialog" aria-label="Choose date range"></div>
+  </div>
+</div>
